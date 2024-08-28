@@ -12,12 +12,14 @@ pub struct OrderMessage {
     pub tgt: f64,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OrderType {
     MIS,
     CNC,
 }
 
+#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum QueueType {
     #[serde(rename = "pending_orders")]

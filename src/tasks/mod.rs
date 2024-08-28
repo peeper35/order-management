@@ -1,2 +1,3 @@
-pub mod channel;
-pub mod order;
+pub mod channels;
+mod helpers;
+pub mod orders;

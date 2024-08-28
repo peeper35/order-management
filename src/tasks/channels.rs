@@ -1,24 +1,25 @@
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use amqprs::channel::{BasicConsumeArguments, Channel, QueueBindArguments};
 use chrono::Local;
-use redis::Client;
 use tokio::sync::Mutex;
 
 use crate::{
+    common::ClientConnected,
     consts::{
-        WebSocket, CUTOFF_TIME, EXCHANGE, EXECUTED_ORDERS_ROUTING_KEY, PENDING_ORDERS_ROUTING_KEY,
-        START_TIME,
+        CUTOFF_TIME, EXCHANGE, EXECUTED_ORDERS_ROUTING_KEY, PENDING_ORDERS_ROUTING_KEY, START_TIME,
     },
     dto::OrderMessage,
-    redis_utils::commands::set_update_redis_order_entry,
-    tasks::order::create_order_task,
+    redis_utils::redis_client::RedisClient,
+    tasks::orders::create_order_task,
+    websocket::websocket_client::WebsocketClient,
 };
 
 pub async fn create_process_channel_task(
     channel: Channel,
-    ws_stream: Arc<Mutex<WebSocket>>,
-    redis: Arc<Mutex<Client>>,
+    ws_client: Arc<Mutex<WebsocketClient>>,
+    redis_client: Arc<Mutex<RedisClient<ClientConnected>>>,
+    subscribed_symbols: Arc<Mutex<HashMap<String, usize>>>,
     queue_name: &str,
     routing_key: &str,
 ) {
@@ -33,7 +34,14 @@ pub async fn create_process_channel_task(
     while let Some(msg) = messages_rx.recv().await {
         let order_message = deserialize_order_message(&msg.content.unwrap());
 
-        process_order_message(order_message, &ws_stream, &redis, queue_name).await;
+        process_order_message(
+            order_message,
+            &ws_client,
+            &redis_client,
+            &subscribed_symbols,
+            queue_name,
+        )
+        .await;
     }
 }
 
@@ -50,8 +58,9 @@ fn deserialize_order_message(content: &[u8]) -> OrderMessage {
 
 async fn process_order_message(
     order_message: OrderMessage,
-    ws_stream: &Arc<Mutex<WebSocket>>,
-    redis: &Arc<Mutex<Client>>,
+    ws_client: &Arc<Mutex<WebsocketClient>>,
+    redis_client: &Arc<Mutex<RedisClient<ClientConnected>>>,
+    subscribed_symbols: &Arc<Mutex<HashMap<String, usize>>>,
     queue_name: &str,
 ) {
     tracing::info!(
@@ -60,21 +69,19 @@ async fn process_order_message(
         order_message.id
     );
 
-    let mut redis_conn = get_redis_connection(redis).await;
-
     if is_trading_time() {
-        set_update_redis_order_entry(
-            &mut redis_conn,
-            order_message.id.clone(),
-            order_message.clone(),
-        )
-        .await;
+        redis_client
+            .lock()
+            .await
+            .set(order_message.id.clone(), order_message.clone())
+            .await;
 
         if should_process_order(queue_name) {
             tokio::spawn(create_order_task(
                 order_message,
-                Arc::clone(ws_stream),
-                Arc::clone(redis),
+                Arc::clone(ws_client),
+                Arc::clone(redis_client),
+                Arc::clone(subscribed_symbols),
             ));
         }
     } else {
@@ -83,15 +90,6 @@ async fn process_order_message(
             Local::now().time()
         );
     }
-}
-
-async fn get_redis_connection(redis: &Arc<Mutex<Client>>) -> redis::aio::MultiplexedConnection {
-    redis
-        .lock()
-        .await
-        .get_multiplexed_tokio_connection()
-        .await
-        .expect("Unable to get connection")
 }
 
 fn should_process_order(queue_name: &str) -> bool {

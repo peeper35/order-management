@@ -1,2 +1,2 @@
 pub mod connection;
-pub mod send;
+pub mod websocket_client;

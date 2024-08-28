@@ -1,50 +1,47 @@
 use chrono::Local;
-use futures_util::StreamExt;
-use redis::{aio::MultiplexedConnection, Client};
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 use tokio::sync::Mutex;
 use tokio_tungstenite::tungstenite::Message;
 
 use crate::{
-    consts::{WebSocket, CUTOFF_TIME, START_TIME},
+    common::ClientConnected,
+    consts::{CUTOFF_TIME, START_TIME},
     dto::{OrderMessage, OrderType, WebsocketMsgRcv},
-    redis_utils::commands::{delete_redis_order_entry, get_redis_order_entry},
+    redis_utils::redis_client::RedisClient,
     utils::sleep_until_next_trading_day,
-    websocket::send::send_subscribe_message,
+    websocket::websocket_client::WebsocketClient,
 };
+
+use super::helpers::update_subscribed_symbols;
 
 pub async fn create_order_task(
     message: OrderMessage,
-    ws_stream: Arc<Mutex<WebSocket>>,
-    redis_client: Arc<Mutex<Client>>,
+    ws_client: Arc<Mutex<WebsocketClient>>,
+    redis_client: Arc<Mutex<RedisClient<ClientConnected>>>,
+    subscribed_symbols: Arc<Mutex<HashMap<String, usize>>>,
 ) {
-    // Subscribe to the websocket with the symbol
-    send_subscribe_message(Arc::clone(&ws_stream), &message.symbol).await;
-
-    // Get Redis connection
-    let mut redis_conn = get_redis_connection(redis_client).await;
+    // Update the subscribed symbols
+    update_subscribed_symbols(
+        message.symbol.clone(),
+        Arc::clone(&ws_client),
+        Arc::clone(&subscribed_symbols),
+    )
+    .await;
 
     // Process the websocket stream
-    process_websocket_stream(message, ws_stream, &mut redis_conn).await;
-}
-
-async fn get_redis_connection(redis_client: Arc<Mutex<Client>>) -> MultiplexedConnection {
-    redis_client
-        .lock()
-        .await
-        .get_multiplexed_tokio_connection()
-        .await
-        .expect("Unable to get Redis connection")
+    process_websocket_stream(message, ws_client, redis_client).await;
 }
 
 async fn process_websocket_stream(
     mut message: OrderMessage,
-    ws_stream: Arc<Mutex<WebSocket>>,
-    redis_conn: &mut MultiplexedConnection,
+    ws_client: Arc<Mutex<WebsocketClient>>,
+    redis_conn: Arc<Mutex<RedisClient<ClientConnected>>>,
 ) {
-    while let Some(msg) = ws_stream.lock().await.next().await {
+    while let Some(msg) = ws_client.lock().await.recv_next().await {
         // Refresh message data from Redis
-        if let Some(refreshed_message) = refresh_order_message(&mut message, redis_conn).await {
+        if let Some(refreshed_message) =
+            refresh_order_message(&mut message, Arc::clone(&redis_conn)).await
+        {
             message = refreshed_message;
         }
 
@@ -53,8 +50,8 @@ async fn process_websocket_stream(
 
         if let Ok(Message::Text(inner_message)) = msg {
             // Handle out-of-trading-hours actions
-            if is_out_of_trading_hours(current_time) {
-                if !handle_out_of_trading_hours(&message, redis_conn).await {
+            if cutoff_time(current_time) {
+                if !handle_cutoff_time(&message, Arc::clone(&redis_conn)).await {
                     break;
                 }
             } else {
@@ -67,18 +64,18 @@ async fn process_websocket_stream(
 
 async fn refresh_order_message(
     message: &mut OrderMessage,
-    redis_conn: &mut MultiplexedConnection,
+    redis_conn: Arc<Mutex<RedisClient<ClientConnected>>>,
 ) -> Option<OrderMessage> {
-    get_redis_order_entry(redis_conn, message.id.clone()).await
+    redis_conn.lock().await.get(message.id.clone()).await
 }
 
-fn is_out_of_trading_hours(current_time: chrono::NaiveTime) -> bool {
+fn cutoff_time(current_time: chrono::NaiveTime) -> bool {
     current_time <= *START_TIME || current_time >= *CUTOFF_TIME
 }
 
-async fn handle_out_of_trading_hours(
+async fn handle_cutoff_time(
     message: &OrderMessage,
-    redis_conn: &mut MultiplexedConnection,
+    redis_conn: Arc<Mutex<RedisClient<ClientConnected>>>,
 ) -> bool {
     match message.order_type {
         OrderType::CNC => {
@@ -87,7 +84,7 @@ async fn handle_out_of_trading_hours(
         }
         OrderType::MIS => {
             tracing::info!("MIS Square off: [{}]. Out of trading hours", &message.id,);
-            delete_redis_order_entry(redis_conn, message.id.clone()).await;
+            redis_conn.lock().await.delete(message.id.clone()).await;
             false
         }
     }

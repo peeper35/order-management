@@ -1,10 +1,24 @@
+use std::collections::HashMap;
+use std::env;
+use std::sync::Arc;
+
 use chrono::{Datelike, Duration, Local, Weekday};
+use tokio::sync::Mutex;
 use tokio::time::sleep_until;
 use tokio::time::Duration as TokioDuration;
 use tokio::time::Instant;
 use tracing_appender::rolling;
 use tracing_subscriber::fmt::writer::MakeWriterExt;
 use tracing_subscriber::EnvFilter;
+
+pub fn get_env_var(key: &str) -> String {
+    env::var(key).expect(format!("Missing {}", key).as_str())
+}
+
+pub fn create_shared_subed_symbol_hmap() -> Arc<Mutex<HashMap<String, usize>>> {
+    let subscribed_sumbols = HashMap::new();
+    Arc::new(Mutex::new(subscribed_sumbols))
+}
 
 pub async fn sleep_until_next_trading_day() {
     let now = Local::now();

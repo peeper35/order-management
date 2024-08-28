@@ -1,11 +1,13 @@
-use std::{env, sync::Arc};
+use std::sync::Arc;
 
-use redis::Client;
 use tokio::sync::Mutex;
 
-pub async fn create_shared_redis_client() -> Arc<Mutex<Client>> {
-    let binding = env::var("REDIS_URL").expect("Missing REDIS_URL");
-    let redis_url = binding.as_str();
-    let client: redis::Client = redis::Client::open(redis_url).unwrap();
-    Arc::new(Mutex::new(client))
+use super::redis_client::RedisClient;
+use crate::{common::ClientConnected, utils::get_env_var};
+
+pub async fn create_shared_redis_client() -> Arc<Mutex<RedisClient<ClientConnected>>> {
+    let redis_url = get_env_var("REDIS_URL");
+
+    let redis_client = RedisClient::new(&redis_url);
+    redis_client.connect().await
 }

@@ -1,15 +1,14 @@
-use rabbit_mq::{create_channels, create_rabbit_mq_connection};
+use rabbit_mq::connection::rabbit_mq_channels;
 use redis_utils::connection::create_shared_redis_client;
 use std::sync::Arc;
-use tasks::channel::create_process_channel_task;
+use tasks::channels::create_process_channel_task;
 use tokio::{self, runtime::Handle};
-use utils::init_subscriber;
-use websocket::connection::create_shared_websocket;
+use utils::{create_shared_subed_symbol_hmap, init_subscriber};
+use websocket::connection::create_shared_websocket_client;
 
 use dotenv::dotenv;
-use tracing;
 
-mod connection;
+mod common;
 mod consts;
 mod dto;
 mod rabbit_mq;
@@ -24,19 +23,21 @@ async fn main() {
 
     init_subscriber();
 
-    let rabbit_mq_connection = create_rabbit_mq_connection().await;
+    #[allow(unused_variables)]
+    let (rabbit_mq_channels, client) = rabbit_mq_channels().await;
 
-    let rabbit_mq_channels = create_channels(rabbit_mq_connection.clone()).await;
+    let ws_stream = create_shared_websocket_client().await;
 
-    let ws_stream = create_shared_websocket().await;
+    let shared_redis_client = create_shared_redis_client().await;
 
-    let redis_client = create_shared_redis_client().await;
+    let subscribed_symbols = create_shared_subed_symbol_hmap();
 
     for (channel, routing_key) in rabbit_mq_channels {
         tokio::spawn(create_process_channel_task(
             channel,
             Arc::clone(&ws_stream),
-            Arc::clone(&redis_client),
+            Arc::clone(&shared_redis_client),
+            Arc::clone(&subscribed_symbols),
             routing_key,
             routing_key,
         ));
