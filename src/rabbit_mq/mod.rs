@@ -1,2 +1,2 @@
-pub mod connection;
-mod rabbit_mq_client;
+pub mod dto;
+pub mod rabbit_mq_client;

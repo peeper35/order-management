@@ -3,10 +3,10 @@ use std::{marker::PhantomData, sync::Arc};
 use redis::{aio::MultiplexedConnection, AsyncCommands, Client};
 use tokio::sync::Mutex;
 
-use crate::{
-    common::{ClientConnected, ClientNotConnected},
-    dto::OrderMessage,
-};
+use crate::rabbit_mq::dto::OrderMessage;
+
+pub struct ClientConnected;
+pub struct ClientNotConnected;
 
 pub struct RedisClient<State> {
     client: Client,

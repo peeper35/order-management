@@ -5,6 +5,7 @@ pub struct OrderMessage {
     pub id: String,
     #[serde(rename = "type")]
     pub queue_type: QueueType,
+    pub exchange: String,
     pub symbol: String,
     pub open_price: f64,
     pub order_type: OrderType,
@@ -12,14 +13,12 @@ pub struct OrderMessage {
     pub tgt: f64,
 }
 
-#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum OrderType {
     MIS,
     CNC,
 }
 
-#[allow(clippy::enum_variant_names)]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum QueueType {
     #[serde(rename = "pending_orders")]
@@ -28,16 +27,4 @@ pub enum QueueType {
     ExecutedOrders,
     #[serde(rename = "update_orders")]
     UpdateOrders,
-}
-
-#[derive(Debug, Clone, Serialize)]
-pub struct WebsocketMsgSnd<'a> {
-    pub action: String,
-    pub symbol: &'a str,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-pub struct WebsocketMsgRcv {
-    pub symbol: String,
-    pub price: f64,
 }
