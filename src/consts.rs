@@ -31,6 +31,6 @@ pub type WebSocket =
     tokio_tungstenite::WebSocketStream<tokio_tungstenite::MaybeTlsStream<tokio::net::TcpStream>>;
 pub type SharedWebsocketClient = Arc<Mutex<WebsocketClient>>;
 pub type SharedRedisClient = Arc<Mutex<RedisClient<ClientConnected>>>;
-pub type SharedSubscribedHashMap = Arc<Mutex<HashMap<String, HashMap<String, usize>>>>;
+pub type SharedSubscribedHashMap = Arc<Mutex<HashMap<String, HashMap<i32, usize>>>>;
 pub type SharedTupleLtpChannel = (Arc<Mutex<Channel>>, &'static str);
 pub type OrderChannels = [(Channel, &'static str); 3];
