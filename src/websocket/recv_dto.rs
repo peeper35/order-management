@@ -1,66 +1,36 @@
 use serde::Deserialize;
 
-pub const AUTH_RECV_MSG: &str = "AuthenticateResult";
-pub const SUBSCRIBE_REALTIME_RECV_MSG: &str = "RealtimeResult";
-
-#[derive(Debug, Deserialize)]
-pub struct AuthenticateRecv {
-    #[serde(rename = "Complete")]
-    pub complete: bool,
-    #[serde(rename = "Message")]
-    pub message: String,
-    #[serde(rename = "MessageType")]
-    pub message_type: String,
+#[derive(Deserialize, Default, Debug)]
+pub struct RealtimeRecv {
+    pub instrument_token: i32,
+    pub last_price: f64,
+    pub average_price: Option<f64>,
+    pub last_quantity: Option<f64>,
+    pub last_trade_time: Option<u64>,
+    pub oi: Option<f64>,
+    pub oi_day_high: Option<f64>,
+    pub oi_day_low: Option<f64>,
+    pub change: f64,
+    pub volume: Option<u64>,
+    pub ohlc: OHLC,
+    pub buy: Option<Vec<BuySell>>,
+    pub buy_quantity: Option<f64>,
+    pub sell: Option<Vec<BuySell>>,
+    pub sell_quantity: Option<f64>,
+    pub timestamp: u64,
 }
 
-#[derive(Debug, Deserialize)]
-pub struct RealtimeRecv {
-    #[serde(rename = "Exchange")]
-    pub exchange: String,
-    #[serde(rename = "InstrumentIdentifier")]
-    pub instrument_identifier: String,
-    #[serde(rename = "LastTradeTime")]
-    pub last_trade_time: u64,
-    #[serde(rename = "ServerTime")]
-    pub server_time: u64,
-    #[serde(rename = "AverageTradedPrice")]
-    pub average_traded_price: f32,
-    #[serde(rename = "BuyPrice")]
-    pub buy_price: f32,
-    #[serde(rename = "BuyQty")]
-    pub buy_qty: u32,
-    #[serde(rename = "Close")]
-    pub close: f32,
-    #[serde(rename = "High")]
-    pub high: f32,
-    #[serde(rename = "Low")]
-    pub low: f32,
-    #[serde(rename = "LastTradePrice")]
-    pub last_trade_price: f32,
-    #[serde(rename = "LastTradeQty")]
-    pub last_trade_qty: u32,
-    #[serde(rename = "Open")]
-    pub open: f32,
-    #[serde(rename = "OpenInterest")]
-    pub open_interest: u32,
-    #[serde(rename = "QuotationLot")]
-    pub quotation_lot: f32,
-    #[serde(rename = "SellPrice")]
-    pub sell_price: f32,
-    #[serde(rename = "SellQty")]
-    pub sell_qty: u32,
-    #[serde(rename = "TotalQtyTraded")]
-    pub total_qty_traded: u32,
-    #[serde(rename = "Value")]
-    pub value: f32,
-    #[serde(rename = "PreOpen")]
-    pub pre_open: bool,
-    #[serde(rename = "PriceChange")]
-    pub price_change: f32,
-    #[serde(rename = "PriceChangePercentage")]
-    pub price_change_percentage: f32,
-    #[serde(rename = "OpenInterestChange")]
-    pub open_interest_change: u32,
-    #[serde(rename = "MessageType")]
-    pub message_type: String,
+#[derive(Deserialize, Debug)]
+pub struct BuySell {
+    pub orders: f64,
+    pub price: f64,
+    pub quantity: f64,
+}
+
+#[derive(Deserialize, Default, Debug)]
+pub struct OHLC {
+    pub open: f64,
+    pub high: f64,
+    pub low: f64,
+    pub close: f64,
 }
