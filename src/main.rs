@@ -34,11 +34,6 @@ async fn main() {
     let shared_redis_client = create_shared_redis_client().await;
     let subscribed_symbols = create_shared_subd_instruments_hmap();
 
-    // Authenticate WebSocket Client
-    // !test
-    // ws_client.lock().await.authenticate().await;
-    // test
-
     // Spawn tasks for each channel
     for (channel, queue_name) in orders_channels {
         tokio::spawn(create_process_channel_task(
