@@ -6,7 +6,7 @@ pub struct OrderMessage {
     #[serde(rename = "type")]
     pub queue_type: QueueType,
     pub exchange: String,
-    pub symbol: String,
+    pub instrument_token: i32,
     pub open_price: f64,
     pub order_type: OrderType,
     pub sl: f64,
