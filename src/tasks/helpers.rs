@@ -58,7 +58,7 @@ pub async fn handle_cutoff_time(message: &OrderMessage, redis_conn: &SharedRedis
 
 pub async fn update_subscribed_symbols(
     exchange: String,
-    message_symbol: String,
+    instrument_token: i32,
     ws_client: SharedWebsocketClient,
     subscribed_symbols: SharedSubscribedHashMap,
 ) {
@@ -72,7 +72,7 @@ pub async fn update_subscribed_symbols(
             .entry(exchange.clone())
             .or_insert_with(HashMap::new);
 
-        match exchange_entry.entry(message_symbol.clone()) {
+        match exchange_entry.entry(instrument_token.clone()) {
             std::collections::hash_map::Entry::Occupied(mut entry) => {
                 sub_count = *entry.get_mut() + 1;
                 entry.insert(sub_count);
@@ -89,13 +89,13 @@ pub async fn update_subscribed_symbols(
         ws_client
             .lock()
             .await
-            .subscribe_instrument(&exchange, &message_symbol)
+            .subscribe_instrument(instrument_token)
             .await;
     }
 
     tracing::info!(
         "[Websocket] Subscribing to {} on {}. Subscribe count: {}",
-        message_symbol,
+        instrument_token,
         exchange,
         sub_count
     );
