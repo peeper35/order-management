@@ -6,7 +6,7 @@ use crate::{
     consts::{SharedRedisClient, SharedSubscribedHashMap, SharedWebsocketClient},
     rabbit_mq::dto::OrderMessage,
     utils::deserialize_message_str,
-    websocket::recv_dto::{RealtimeRecv, SUBSCRIBE_REALTIME_RECV_MSG},
+    websocket::recv_dto::RealtimeRecv,
 };
 
 use super::helpers::{
@@ -22,7 +22,7 @@ pub async fn create_order_task(
     // Update the subscribed symbols
     update_subscribed_symbols(
         message.exchange.clone(),
-        message.symbol.clone(),
+        message.instrument_token.clone(),
         Arc::clone(&ws_client),
         Arc::clone(&subscribed_symbols),
     )
@@ -64,8 +64,12 @@ async fn process_message(
     }
 
     if let Ok(r_data) = deserialize_message_str::<RealtimeRecv>(&inner_message) {
-        if r_data.message_type == SUBSCRIBE_REALTIME_RECV_MSG {
-            tracing::info!("[{}] - LTP: {}", message.symbol, r_data.last_trade_price);
+        if message.instrument_token == r_data.instrument_token {
+            tracing::info!(
+                "[{}] - LTP: {}",
+                message.instrument_token,
+                r_data.last_price
+            );
         }
     }
     // test
