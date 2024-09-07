@@ -2,18 +2,21 @@ use std::sync::Arc;
 
 use futures_util::{SinkExt, StreamExt};
 use tokio::sync::Mutex;
-use tokio_tungstenite::{connect_async, tungstenite::Message};
+use tokio_tungstenite::{
+    connect_async,
+    tungstenite::{
+        client::IntoClientRequest,
+        http::{header::SEC_WEBSOCKET_PROTOCOL, HeaderValue},
+        Message,
+    },
+};
 
 use crate::{
     consts::{SharedWebsocketClient, WebSocket},
-    utils::deserialize_message_str,
-    websocket::recv_dto::AUTH_RECV_MSG,
+    utils::get_env_var,
 };
 
-use super::{
-    recv_dto::AuthenticateRecv,
-    send_dto::{Authenticate, SubscribeRealtime},
-};
+use super::send_dto::SubscribeRealtime;
 
 pub struct WebsocketClient {
     ws_stream: WebSocket,
@@ -21,31 +24,16 @@ pub struct WebsocketClient {
 
 impl WebsocketClient {
     pub async fn connect(url: &str) -> SharedWebsocketClient {
-        let (ws_stream, _) = connect_async(url)
+        let mut request = url.into_client_request().unwrap();
+        request.headers_mut().append(
+            SEC_WEBSOCKET_PROTOCOL,
+            HeaderValue::from_str(&get_env_var("LTP_WEBSOCKET_AUTH_KEY")).unwrap(),
+        );
+        let (ws_stream, _) = connect_async(request)
             .await
             .expect("Failed to connect to WebSocket");
 
         Arc::new(Mutex::new(Self { ws_stream }))
-    }
-
-    pub async fn authenticate(&mut self) {
-        let auth_message = Authenticate::new().serialize();
-
-        self.send_message(auth_message).await;
-
-        while let Some(Ok(msg)) = self.recv_next().await {
-            if let Ok(auth) = deserialize_message_str::<AuthenticateRecv>(&msg.into_text().unwrap())
-            {
-                if auth.message_type == AUTH_RECV_MSG {
-                    if auth.complete {
-                        tracing::info!("[WebSocket] Authentication successful");
-                    } else {
-                        tracing::error!("[WebSocket] Authentication failed: {}", auth.message);
-                    }
-                    break;
-                }
-            }
-        }
     }
 
     pub async fn subscribe_instrument(&mut self, exchange: &str, instrument_identifier: &str) {
