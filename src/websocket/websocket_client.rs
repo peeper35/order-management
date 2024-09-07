@@ -16,8 +16,6 @@ use crate::{
     utils::get_env_var,
 };
 
-use super::send_dto::SubscribeRealtime;
-
 pub struct WebsocketClient {
     ws_stream: WebSocket,
 }
@@ -36,8 +34,8 @@ impl WebsocketClient {
         Arc::new(Mutex::new(Self { ws_stream }))
     }
 
-    pub async fn subscribe_instrument(&mut self, exchange: &str, instrument_identifier: &str) {
-        let subscribe_message = SubscribeRealtime::new(exchange, instrument_identifier).serialize();
+    pub async fn subscribe_instrument(&mut self, instrument_token: i32) {
+        let subscribe_message = format!("[{}]", instrument_token);
 
         self.send_message(subscribe_message).await;
     }
